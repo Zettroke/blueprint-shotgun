@@ -17,6 +17,7 @@ function lib.process(params)
     if #entities == 0 then return end
 
     for index, entity in pairs(entities) do
+        if not entity.valid then goto continue end
         if entity.type == "item-entity" or entity.type == "deconstructible-tile-proxy" or entity.type == "cliff" then
             entities[index] = nil
             goto continue
