@@ -9,47 +9,48 @@ function lib.process(params)
     if params.ammo_limit == 0 then return end
 
     local entities = utils.find_entities_in_radius(params.surface, {
+        to_be_upgraded = true,
         position = params.target_pos,
         radius = params.radius,
-        to_be_upgraded = true,
-    })
+    }, true)
     table.sort(entities, utils.distance_sort(params.target_pos))
     utils.arc_cull(entities, params.character.position, params.target_pos)
 
+    local used = false
+
     for _, entity in pairs(entities) do
-        if global.to_upgrade[entity.unit_number] then goto continue end
-        local upgrade_target = entity.get_upgrade_target() --[[@as LuaEntityPrototype]]
-        if upgrade_target.name == entity.name then goto continue end
+        if storage.to_upgrade[entity.unit_number] then goto continue end
+        local upgrade_target, quality = entity.get_upgrade_target()
+        ---@cast upgrade_target -?
+        ---@cast quality -?
 
-        local place_items = upgrade_target.items_to_place_this ---@cast place_items -nil
-        local item
-        for _, place_item in pairs(place_items) do
-            if params.inventory.get_item_count(place_item.name) >= place_item.count then
-                item = place_item
-                break
-            end
-        end
+        local item, stack = utils.find_place_result_stack(params.inventory, upgrade_target.items_to_place_this, quality)
         if not item then goto continue end
-        local is_underground_belt = entity.type == "underground-belt"
+        ---@cast stack -?
+
         local connection
-        if is_underground_belt then
+        if entity.type == "underground-belt" then
             connection = entity.neighbours
-            if connection then
-                -- impossible for connection not be marked for upgrade so no need to check
+            if connection and connection.type == "underground-belt" then
+                -- impossible for connection to not be marked for upgrade so no need to check
                 item.count = item.count * 2
-                global.to_upgrade[connection.unit_number] = true
+                if stack.count < item.count then goto continue end
+                storage.to_upgrade[connection.unit_number] = true
+            else
+                connection = nil
             end
         end
-        params.inventory.remove(item)
 
-        local id, shadow = render.draw_new_item(params.surface, item.name, params.source_pos)
+        local slot = game.create_inventory(1)
+        slot[1].transfer_stack(stack, item.count)
+
+        local sprite, shadow = render.draw_new_item(params.surface, item.name, params.source_pos)
         local duration = utils.get_flying_item_duration(params.source_pos, entity.position)
-        global.flying_items[id] = {
+        storage.flying_items[sprite.id] = {
             action = "upgrade",
+            slot = slot,
             surface = params.surface,
             force = params.force,
-            name = item.name,
-            count = item.count,
             source_pos = params.source_pos,
             target_pos = entity.position,
             start_tick = params.tick,
@@ -57,42 +58,151 @@ function lib.process(params)
             orientation_deviation = utils.orientation_deviaiton(),
             target_entity = entity,
             unit_number = entity.unit_number,
+            sprite = sprite,
             shadow = shadow,
             connection = connection,
         } --[[@as FlyingUpgradeItem]]
 
-        global.to_upgrade[entity.unit_number] = true
+        storage.to_upgrade[entity.unit_number] = true
 
+        used = true
         params.ammo_item.drain_ammo(1)
         params.ammo_limit = params.ammo_limit - 1
         if params.ammo_limit <= 0 then break end
 
         ::continue::
     end
+
+    return used
+end
+
+---@param item FlyingUpgradeItem
+local function upgrade(item)
+    local entity = item.target_entity --[[@as LuaEntity]]
+    if not entity.valid then return end
+    local target = entity.get_upgrade_target()
+    if not target then return end
+
+    ---@type {contents: DetailedItemOnLine[], inventory: LuaInventory}[]?
+    local lines
+    local connection = item.connection
+    if connection and connection.valid then
+        lines = {}
+        local output = entity.belt_to_ground_type == "input" and entity or item.connection --[[@as LuaEntity]]
+        for i = 1, 2 do
+            local line = output.get_transport_line(i + 2)
+            local contents = line.get_detailed_contents()
+            local inventory = game.create_inventory(#contents)
+            for j = #contents, 1, -1 do
+                inventory[j].transfer_stack(contents[j].stack)
+            end
+            lines[i] = {
+                contents = contents,
+                inventory = inventory,
+            }
+        end
+    end
+
+    local surface = entity.surface
+    local force = entity.force
+    local position = entity.position
+    local etype = entity.type
+    local belt_to_ground_type = etype == "underground-belt" and entity.belt_to_ground_type or nil
+    local loader_type = (etype == "loader" or etype == "loader-1x1") and entity.loader_type or nil
+
+    local character = utils.temp_character(surface)
+    local success = surface.create_entity{
+        name = target.name,
+        position = position,
+        direction = entity.direction,
+        force = force,
+        fast_replace = true,
+        character = character,
+        create_build_effect_smoke = true,
+        raise_built = true,
+        type = belt_to_ground_type or loader_type,
+    }
+
+    if lines then
+        ---@cast connection -?
+        connection = surface.create_entity{
+            name = target.name,
+            position = connection.position,
+            direction = connection.direction,
+            force = force,
+            fast_replace = true,
+            character = character,
+            create_build_effect_smoke = true,
+            raise_built = true,
+            type = connection.belt_to_ground_type
+        }
+
+        if connection ~= success then
+            item.slot[1].count = item.slot[1].count / 2
+        end
+    end
+
+    if success then
+        surface.play_sound{path = "entity-build/" .. target.name, position = position}
+        local inventory = character.get_main_inventory() --[[@as LuaInventory]]
+        for i = 1, #inventory do
+            local stack = inventory[i]
+            if not stack.valid_for_read then break end
+            surface.spill_item_stack{
+                position = position,
+                stack = stack,
+                force = force,
+                allow_belts = false
+            }
+        end
+    end
+    character.destroy()
+
+    if lines then
+        if success and connection then
+            local output = success.belt_to_ground_type == "input" and success or connection --[[@as LuaEntity]]
+            for i = 1, 2 do
+                local line = lines[i]
+                local contents = line.contents
+                local inventory = line.inventory
+                local insert = output.get_transport_line(i + 2).force_insert_at
+                for j = 1, #inventory do
+                    insert(contents[j].position, inventory[j])
+                end
+            end
+        else
+            for i = 1, 2 do
+                local inventory = lines[i].inventory
+                for j = 1, #inventory do
+                    surface.spill_item_stack{
+                        position = position,
+                        stack = inventory[j],
+                        force = force,
+                        allow_belts = false
+                    }
+                end
+            end
+        end
+        for i = 1, 2 do
+            lines[i].inventory.destroy()
+        end
+    end
+
+    return success
 end
 
 ---@param item FlyingUpgradeItem
 function lib.action(item)
-    local target_entity = item.target_entity --[[@as LuaEntity]]
-    if target_entity.valid and utils.upgrade_entity(target_entity) then
-        local connection = item.connection
-        if connection and connection.valid then
-            if not utils.upgrade_entity(connection, item.target_pos) then
-                item.count = item.count / 2
-                utils.spill_item(item)
-            end
-        end
-    else
+    if not upgrade(item) then
         utils.spill_item(item)
     end
-    global.to_upgrade[item.unit_number] = nil
+    storage.to_upgrade[item.unit_number] = nil
 end
 
 return lib
 
 ---@class FlyingUpgradeItem:FlyingItemBase
 ---@field action "upgrade"
----@field count uint
 ---@field target_entity LuaEntity
 ---@field unit_number uint
 ---@field connection LuaEntity?

@@ -18,13 +18,16 @@ function lib.process(params)
     table.sort(cliffs, utils.distance_sort(params.target_pos))
     utils.arc_cull(cliffs, params.character.position, params.target_pos)
 
+    local used = false
+
     for _, cliff in pairs(cliffs) do
         local explosive_name = cliff.prototype.cliff_explosive_prototype --[[@as string]]
-        if params.inventory.get_item_count(explosive_name) == 0 then goto continue end
+        local count, quality = utils.get_item_count_aq(params.inventory, explosive_name)
+        if count == 0 then goto continue end
 
-        if global.to_explode[script.register_on_entity_destroyed(cliff)] then goto continue end
+        if storage.to_explode[script.register_on_object_destroyed(cliff)] then goto continue end
 
-        local capsule_action = game.item_prototypes[explosive_name].capsule_action --[[@as CapsuleAction]]
+        local capsule_action = prototypes.item[explosive_name].capsule_action --[[@as CapsuleAction]]
         local cliff_position = utils.get_bounding_box_center(cliff)
         local candidates = utils.find_entities_in_radius(params.surface, {
             type = "cliff",
@@ -47,61 +50,67 @@ function lib.process(params)
             radius = capsule_action.radius + 1
         })
         for _, exploding_cliff in pairs(exploding_cliffs) do
-            local reg_id = script.register_on_entity_destroyed(exploding_cliff)
-            global.to_explode[reg_id] = true
+            local reg_id = script.register_on_object_destroyed(exploding_cliff)
+            storage.to_explode[reg_id] = true
             to_explode[reg_id] = true
         end
 
-        params.inventory.remove{name = explosive_name, count = 1}
+        local slot = game.create_inventory(1)
+        local stack = params.inventory.find_item_stack{name = explosive_name, quality = quality} ---@cast stack LuaItemStack
+        slot[1].transfer_stack(stack, 1)
 
-        local id, shadow = render.draw_new_item(params.surface, explosive_name, params.source_pos)
+        local sprite, shadow = render.draw_new_item(params.surface, explosive_name, params.source_pos)
         local duration = utils.get_flying_item_duration(params.source_pos, center)
-        global.flying_items[id] = {
+        storage.flying_items[sprite.id] = {
             action = "cliff",
+            slot = slot,
             surface = params.surface,
             force = params.character.force,
-            name = explosive_name,
             source_pos = params.source_pos,
             target_pos = center,
             start_tick = params.tick,
             end_tick = params.tick + duration,
             orientation_deviation = utils.orientation_deviaiton(),
+            sprite = sprite,
             shadow = shadow,
             to_explode = to_explode
         } --[[@as FlyingCliffExplosiveItem]]
 
+        used = true
         params.ammo_item.drain_ammo(1)
         params.ammo_limit = params.ammo_limit - 1
         if params.ammo_limit <= 0 then break end
 
         ::continue::
     end
+
+    return used
 end
 
 ---@param item FlyingCliffExplosiveItem
 function lib.action(item)
     item.surface.create_entity{
-        name = item.name,
+        name = item.slot[1].name, -- assumes projectile and item share prototype name
         position = item.target_pos,
         target = item.target_pos,
         speed = 1,
     }
 
     local tick = game.tick + 1
-    local queue = global.remove_explode_queue[tick] or {}
-    global.remove_explode_queue[tick] = queue
+    local queue = storage.remove_explode_queue[tick] or {}
+    storage.remove_explode_queue[tick] = queue
     for reg_id in pairs(item.to_explode) do
         queue[#queue+1] = reg_id
     end
 end
 
 function lib.on_tick(event)
-    local queue = global.remove_explode_queue[event.tick]
+    local queue = storage.remove_explode_queue[event.tick]
     if not queue then return end
     for _, reg_id in pairs(queue) do
-        global.to_explode[reg_id] = nil
+        storage.to_explode[reg_id] = nil
     end
-    global.remove_explode_queue[event.tick] = nil
+    storage.remove_explode_queue[event.tick] = nil
 end
 
 return lib

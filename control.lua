@@ -1,67 +1,69 @@
 local e = defines.events
 
-local vec = require("scripts/vector")
-local render = require("scripts/render")
-local utils = require("scripts/utils")
+local vec = require("scripts/vector") --[[@as BlueprintShotgun.vector]]
+local render = require("scripts/render") --[[@as BlueprintShotgun.render]]
+local utils = require("scripts/utils") --[[@as BlueprintShotgun.utils]]
 
-local flying_items = require("scripts/flying-items")
-local sound = require("scripts/sound")
-local cliffs = require("scripts/build/cliffs")
+local flying_items = require("scripts/flying-items") --[[@as BlueprintShotgun.flying_items]]
+local sound = require("scripts/sound") --[[@as BlueprintShotgun.sound]]
+local cliffs = require("scripts/build/cliffs") --[[@as BlueprintShotgun.cliffs]]
 
 local build = {
-    cliffs.process,
-    require("scripts/build/entity-ghosts").process,
-    require("scripts/build/upgrades").process,
-    require("scripts/build/proxies").process,
-    require("scripts/build/tile-ghosts").process,
+    cliffs = cliffs.process,
+    entity_ghosts = require("scripts/build/entity-ghosts").process,
+    upgrades = require("scripts/build/upgrades").process,
+    proxies = require("scripts/build/proxies").process,
+    tile_ghosts = require("scripts/build/tile-ghosts").process,
 }
 
 local mine = {
-    require("scripts/mine/entities").process,
-    require("scripts/mine/tiles").process,
-    require("scripts/mine/item-entities").process,
+    require("scripts/mine/entities"),
+    require("scripts/mine/tiles"),
+    require("scripts/mine/item-entities"),
+    require("scripts/mine/proxies"),
 }
 
 local function setup_globals()
     ---@type table<uint, FlyingItem>
-    global.flying_items = global.flying_items or {}
-
+    storage.flying_items = storage.flying_items or {}
     ---@type table<uint, VacuumItem>
-    global.vacuum_items = global.vacuum_items or {}
-
+    storage.vacuum_items = storage.vacuum_items or {}
     ---@type table<uint, uint[]?>
-    global.remove_explode_queue = global.remove_explode_queue or {}
-
+    storage.remove_explode_queue = storage.remove_explode_queue or {}
     ---@type table<uint, true>
-    global.to_explode = global.to_explode or {}
-
+    storage.to_explode = storage.to_explode or {}
     ---@type table<uint, true>
-    global.to_build = global.to_build or {}
-
+    storage.to_build = storage.to_build or {}
     ---@type table<uint, true>
-    global.to_upgrade = global.to_upgrade or {}
-
-    ---@type table<uint, table<string, uint>>
-    global.to_insert = global.to_insert or {}
-
+    storage.to_upgrade = storage.to_upgrade or {}
+    ---@type ItemWithQualityCounts[]
+    storage.to_insert = storage.to_insert or {}
     ---@type table<uint, BlueprintShotgun.MiningData>
-    global.to_mine = global.to_mine or {}
-
+    storage.to_mine = storage.to_mine or {}
     ---@type table<uint, true>
-    global.currently_mining = global.currently_mining or {}
-
+    storage.currently_mining = storage.currently_mining or {}
     ---@type table<uint, BlueprintShotgun.CharacterData>
-    global.characters = global.characters or {}
+    storage.characters = storage.characters or {}
+
+    ---@type table<string, true>?
+    storage.cubes = script.active_mods["Ultracube"] and remote.call("Ultracube", "cube_item_prototypes")
 end
 
 script.on_init(setup_globals)
-script.on_configuration_changed(setup_globals)
+script.on_configuration_changed(function(data)
+    if data.old_version and data.old_version < "0.1.0" then
+        storage = {}
+        rendering.clear("blueprint-shotgun")
+    end
+    setup_globals()
+end)
 
+---@param event EventData.CustomInputEvent
 script.on_event("blueprint-shotgun-shoot", function(event)
     local player = game.get_player(event.player_index) --[[@as LuaPlayer]]
-    if player.mod_settings["blueprint-shotgun-disable-auto-swap"].value then return end
     if not player.character then return end
     local data = utils.get_character_data(player.character)
+    if not data.auto_swap then return end
     if event.tick - data.tick < 30 then return end
     local selected = player.selected
     if not selected then return end
@@ -70,34 +72,60 @@ script.on_event("blueprint-shotgun-shoot", function(event)
     end
 end)
 
+---@param event EventData.CustomInputEvent
 script.on_event("blueprint-shotgun-mode-swap", function(event)
     local player = game.get_player(event.player_index) --[[@as LuaPlayer]]
+    if not player.character then return end
     local data = utils.get_character_data(player.character)
     local gun_inv = data.character.get_inventory(defines.inventory.character_guns) --[[@as LuaInventory]]
     local gun = gun_inv[data.character.selected_gun_index]
     if not (gun and gun.valid_for_read) then return end
     if gun.name ~= "blueprint-shotgun" then return end
-    data.mode = data.mode == "build" and "mine" or "build"
+    local text
+    if player.mod_settings["blueprint-shotgun-mode-swap"].value == "3-way" then
+        if data.auto_swap then
+            data.auto_swap = false
+            data.mode = "build"
+            text = "build"
+        elseif data.mode == "build" then
+            data.mode = "mine"
+            text = "mine"
+        else
+            data.auto_swap = true
+            text = "auto"
+        end
+    else
+        data.mode = data.mode == "build" and "mine" or "build"
+        text = data.mode
+    end
+
     player.play_sound{path = "utility/switch_gun"}
     player.create_local_flying_text{
         color = {1,1,1},
         position = player.position,
-        text = {"blueprint-shotgun.mode-" .. data.mode}
+        text = {"blueprint-shotgun.mode-swap", {"blueprint-shotgun.mode-" .. text}}
     }
 end)
+
+-- script.on_event(e.on_runtime_mod_setting_changed, function(event)
+--     if event.setting ~= "blueprint-shotgun-mode-swap" then return end
+--     local player = game.get_player(event.player_index) --[[@as LuaPlayer]]
+--     if not player.character then return end
+--     local data = utils.get_character_data(player.character)
+-- end)
 
 local direction_to_angle = 1 / defines.direction.south * math.pi
 
 script.on_event(e.on_script_trigger_effect, function(event)
     if event.effect_id ~= "blueprint-shotgun" then return end
     local surface = game.get_surface(event.surface_index) --[[@as LuaSurface]]
-    local character = event.source_entity --[[@as LuaEntity]]
+    local character = event.source_entity
     if not character then return end
 
     -- if character.player then
     --     rendering.draw_circle{
     --         color = {r = 0.05, g = 0.1, b = 0.05, a = 0.15},
-    --         radius = 15,
+    --         radius = 15 + character.get_radius(),
     --         surface = character.surface,
     --         target = character,
     --         draw_on_ground = true,
@@ -124,7 +152,7 @@ script.on_event(e.on_script_trigger_effect, function(event)
     local ammo_item = ammo_inv[gun_index]
     local ammo_limit = math.min(4 + 2 * bonus, (ammo_item.count - 1) * ammo_item.prototype.stack_size + ammo_item.ammo) --[[@as number]]
 
-    local target_direction = math.floor((math.atan2(-source_pos.x + target_pos.x, source_pos.y - target_pos.y) / (2 * math.pi) + 17/16) % 1 * 8)
+    local target_direction = math.floor((math.atan2(-source_pos.x + target_pos.x, source_pos.y - target_pos.y) / (2 * math.pi) + 17/16) % 1 * 8) * 2
 
     ---@class BlueprintShotgun.HandlerParams
     ---@field ammo_limit integer -- required to be mutable for some stupid reason
@@ -146,19 +174,26 @@ script.on_event(e.on_script_trigger_effect, function(event)
     if data.mode == "build" then
         if event.tick - data.tick < 30 then return end
 
-        for _, process in pairs(build) do
-            process(params)
+        local not_tiles = false
+        local tiles = false
+        for name, process in pairs(build) do
+            if process(params) then
+                if name == "tile_ghosts" then
+                    tiles = true
+                else
+                    not_tiles = true
+                end
+            end
             if not params.ammo_item.valid_for_read then break end
         end
 
         local used_item_count = ammo_limit - params.ammo_limit
         if used_item_count > 0 then
             game.play_sound{path = "blueprint-shotgun-shoot", position = source_pos}
-            data.tick = event.tick
+            data.tick = (tiles and not not_tiles) and event.tick - 25 or event.tick
         end
 
-        if used_item_count == 0 then
-            if character.player and character.player.mod_settings["blueprint-shotgun-disable-auto-swap"].value then return end
+        if used_item_count == 0 and data.auto_swap then
             data.mode = "mine"
         end
     end
@@ -166,6 +201,7 @@ script.on_event(e.on_script_trigger_effect, function(event)
     if data.mode == "mine" then
         if event.tick - data.tick < 3 then return end
 
+        params.radius = 2
         local mined
         for _, process in pairs(mine) do
             mined = process(params) or mined
@@ -176,8 +212,8 @@ script.on_event(e.on_script_trigger_effect, function(event)
             render.smoke(surface, target_pos, character)
             data.tick = event.tick
         else
+            if not data.auto_swap then return end
             if event.tick - data.tick < 30 then return end
-            if character.player and character.player.mod_settings["blueprint-shotgun-disable-auto-swap"].value then return end
             data.mode = "build"
         end
     end
@@ -190,29 +226,29 @@ script.on_event(e.on_tick, function(event)
     sound.on_tick(event)
 end)
 
-script.on_event(e.on_entity_destroyed, function(event)
-    if not event.unit_number then return end
-    global.characters[event.unit_number] = nil
-    global.to_explode[event.registration_number] = nil
+script.on_event(e.on_object_destroyed, function(event)
+    if not event.useful_id then return end
+    storage.characters[event.useful_id] = nil
+    storage.to_explode[event.registration_number] = nil
 end)
 
 script.on_event(e.on_surface_deleted, function(event)
-    for id, item in pairs(global.flying_items) do
+    for id, item in pairs(storage.flying_items) do
         if item.surface.valid then goto continue end
-        global.flying_items[id] = nil
+        storage.flying_items[id] = nil
 
         local entity = item.target_entity
         if not entity then goto continue end
-        global.to_build[item.unit_number] = nil
-        global.to_insert[item.unit_number] = nil
-        global.to_upgrade[item.unit_number] = nil
+        storage.to_build[item.unit_number] = nil
+        storage.to_insert[item.unit_number] = nil
+        storage.to_upgrade[item.unit_number] = nil
 
         ::continue::
     end
 
-    for id, item in pairs(global.vacuum_items) do
+    for id, item in pairs(storage.vacuum_items) do
         if item.surface.valid then goto continue end
-        global.vacuum_items[id] = nil
+        storage.vacuum_items[id] = nil
 
         ::continue::
     end

@@ -52,6 +52,11 @@ function vec.random(n)
     return vec.rotate({x = n, y = 0}, math.random() * tau)
 end
 
+local abs = math.abs
+function vec.abs(v)
+    return {x = abs(v.x), y = abs(v.y)}
+end
+
 -- function vec.clamp(v, n, m)
 --     return {
 --         x = max(min(v.x, n), m),

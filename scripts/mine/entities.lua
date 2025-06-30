@@ -2,16 +2,15 @@ local utils = require("scripts/utils") --[[@as BlueprintShotgun.utils]]
 local vec = require("scripts/vector") --[[@as BlueprintShotgun.vector]]
 local render = require("scripts/render") --[[@as BlueprintShotgun.render]]
 
----@class BlueprintShotgun.mine
-local lib = {}
+local ultracube_active = script.active_mods["Ultracube"]
 
 ---@param params BlueprintShotgun.HandlerParams
-function lib.process(params)
+return function(params)
     local entities = utils.find_entities_in_radius(params.surface, {
-        position = params.target_pos,
-        radius = 2,
         to_be_deconstructed = true,
-    })
+        position = params.target_pos,
+        radius = params.radius,
+    }, true)
     table.sort(entities, utils.distance_sort(params.target_pos))
 
     if #entities == 0 then return end
@@ -24,8 +23,8 @@ function lib.process(params)
         end
         if entity.minable == false then goto continue end
         if entity.prototype.mineable_properties.minable == false then goto continue end
-        local entity_id = entity.unit_number or script.register_on_entity_destroyed(entity)
-        local data = global.to_mine[entity_id]
+        local entity_id = entity.unit_number or script.register_on_object_destroyed(entity)
+        local data = storage.to_mine[entity_id]
         if not data then
             local mineable_properties = entity.prototype.mineable_properties
             data = {
@@ -33,16 +32,16 @@ function lib.process(params)
                 progress = 0,
                 mining_time = math.max(mineable_properties.mining_time, 0.5) * 60,
             }
-            global.to_mine[entity_id] = data
+            storage.to_mine[entity_id] = data
         end
 
         local stack
         if entity.type ~= "infinity-container" then
             for i = 1, entity.get_max_inventory_index() do
-                local inventory = entity.get_inventory(i) --[[@as LuaInventory]]
+                local inventory = entity.get_inventory(i --[[@as defines.inventory]]) --[[@as LuaInventory]]
                 if inventory and not inventory.is_empty() then
-                    local name = next(inventory.get_contents())
-                    stack = inventory.find_item_stack(name)
+                    local item = inventory.get_contents()[1]
+                    stack = inventory.find_item_stack(item.name)
                     break
                 end
             end
@@ -50,11 +49,11 @@ function lib.process(params)
 
         if stack then
             game.play_sound{path = "utility/picked_up_item", position = entity.position}
-            local id, shadow = render.draw_new_item(entity.surface, stack.name, entity.position, 0)
-            rendering.move_to_back(id)
+            local sprite, shadow = render.draw_new_item(entity.surface, stack.name, entity.position, 0)
+            sprite.move_to_back()
             local slot = game.create_inventory(1)
             slot[1].transfer_stack(stack)
-            global.vacuum_items[id] = {
+            local vacuum_item = {
                 slot = slot,
                 surface = params.surface,
                 character = params.character,
@@ -63,27 +62,32 @@ function lib.process(params)
                 velocity = vec.random(1/15),
                 height = 0,
                 orientation_deviation = utils.orientation_deviaiton(),
+                sprite = sprite,
                 shadow = shadow,
                 deconstruct = params.character.force,
             }
+            storage.vacuum_items[sprite.id] = vacuum_item
+            if ultracube_active then
+                local slot_item = slot[1]
+                local name = slot_item.name
+                if storage.cubes[name] then
+                    vacuum_item.ultracube_token = utils.create_ultracube_token(name, slot_item.count, params.surface, entity.position, vacuum_item.velocity, 0)
+                end
+            end
             goto continue
         end
 
         local progress = params.mining_speed / math.max(1, vec.dist(params.target_pos, entity.position))
-        data.progress = data.progress + progress
-        global.currently_mining[entity_id] = true
+        data.progress = math.min(data.mining_time, data.progress + progress)
+        storage.currently_mining[entity_id] = true
 
         if data.progress < data.mining_time then goto continue end
-
-        local sound_path = "entity-mined/" .. entity.name
-        if game.is_valid_sound_path(sound_path) then
-            game.play_sound{path = sound_path, position = entity.position}
-        end
 
         if entity.type == "infinity-container" then
             entity.clear_items_inside()
         end
 
+        local sound_path = "entity-mined/" .. entity.name
         local position = entity.position
         local products = entity.prototype.mineable_properties.products
         local size = products and #products or 0
@@ -94,16 +98,19 @@ function lib.process(params)
             temp_inventory.resize(size)
             success = entity.mine{inventory = temp_inventory, force = false, raise_destroyed = true}
         end
-        global.to_mine[entity_id] = nil
+        storage.to_mine[entity_id] = nil
+        if helpers.is_valid_sound_path(sound_path) then
+            game.play_sound{path = sound_path, position = position}
+        end
 
         for i = 1, #temp_inventory do
             local item = temp_inventory[i]
             if not item.valid_for_read then break end
-            local id, shadow = render.draw_new_item(params.surface, item.name, position, 0)
-            rendering.move_to_back(id)
+            local sprite, shadow = render.draw_new_item(params.surface, item.name, position, 0)
+            sprite.move_to_back()
             local slot = game.create_inventory(1)
             slot[1].transfer_stack(item)
-            global.vacuum_items[id] = {
+            local vacuum_item = {
                 slot = slot,
                 surface = params.surface,
                 character = params.character,
@@ -112,9 +119,19 @@ function lib.process(params)
                 velocity = vec.random(1/15),
                 height = 0,
                 orientation_deviation = utils.orientation_deviaiton(),
+                sprite = sprite,
                 shadow = shadow,
                 deconstruct = params.character.force,
             }
+            storage.vacuum_items[sprite.id] = vacuum_item
+
+            if ultracube_active then
+                local slot_item = slot[1]
+                local name = slot_item.name
+                if storage.cubes[name] then
+                    vacuum_item.ultracube_token = utils.create_ultracube_token(name, slot_item.count, params.surface, position, vacuum_item.velocity, 0)
+                end
+            end
         end
         temp_inventory.destroy()
 
@@ -127,11 +144,9 @@ function lib.process(params)
     return not not next(entities)
 end
 
-return lib
-
 ---@class BlueprintShotgun.MiningData
 ---@field entity LuaEntity
 ---@field progress number
 ---@field mining_time number
----@field bar uint?
----@field bar_black uint?
+---@field bar LuaRenderObject?
+---@field bar_black LuaRenderObject?

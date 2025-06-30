@@ -1,159 +1,167 @@
-data:extend{
-    {
-        type = "gun",
-        name = "blueprint-shotgun",
-        icon = "__blueprint-shotgun__/graphics/blueprint-shotgun.png",
-        icon_size = 64,
-        stack_size = 1,
-        attack_parameters = {
-            type = "projectile",
-            cooldown = 1,
-            range = 15,
-            movement_slow_down_factor = 0,
-            ammo_consumption_modifier = 0,
-            ammo_categories = {"blueprint-ammo"},
-        },
-        subgroup = "gun",
-        order = "a[a-blueprint-shotgun]",
-    } --[[@as data.GunPrototype]],
-    {
-        type = "ammo",
-        name = "item-canister",
-        icon = "__blueprint-shotgun__/graphics/item-canister.png",
-        icon_size = 64,
-        stack_size = 200,
-        magazine_size = 25,
-        ammo_type = {
-            category = "blueprint-ammo",
-            target_type = "position",
-            action = {
-                type = "direct",
-                action_delivery = {
-                    type = "instant",
-                    target_effects = {
-                        type = "script",
-                        effect_id = "blueprint-shotgun",
-                    },
+data:extend{{
+    type = "gun",
+    name = "blueprint-shotgun",
+    icon = "__blueprint-shotgun__/graphics/blueprint-shotgun.png",
+    stack_size = 1,
+    attack_parameters = {
+        type = "projectile",
+        cooldown = 1,
+        range = 15,
+        movement_slow_down_factor = 0,
+        ammo_consumption_modifier = 0,
+        ammo_categories = {"blueprint-ammo"},
+    },
+    subgroup = "tool",
+    order = "d[blueprint-shotgun]-a[blueprint-shotgun]",
+}} --[[@as data.GunPrototype[] ]]
+
+data:extend{{
+    type = "ammo",
+    name = "item-canister",
+    icon = "__blueprint-shotgun__/graphics/item-canister.png",
+    stack_size = 200,
+    magazine_size = 25,
+    ammo_category = "blueprint-ammo",
+    ammo_type = {
+        target_type = "position",
+        action = {
+            type = "direct",
+            action_delivery = {
+                type = "instant",
+                target_effects = {
+                    type = "script",
+                    effect_id = "blueprint-shotgun",
                 },
             },
         },
-        subgroup = "ammo",
-        order = "a[a-blueprint-shotgun]",
-    } --[[@as data.AmmoItemPrototype]],
-    {
-        type = "ammo-category",
-        name = "blueprint-ammo",
-    } --[[@as data.AmmoCategory]],
-    {
-        type = "recipe",
-        name = "blueprint-shotgun",
-        energy_required = 10,
-        results = {{type = "item", name = "blueprint-shotgun", amount = 1}},
+    },
+    subgroup = "tool",
+    order = "d[blueprint-shotgun]-b[item-canister]",
+}} --[[@as data.AmmoItemPrototype[] ]]
+
+data:extend{{
+    type = "ammo-category",
+    name = "blueprint-ammo",
+    icon = "__blueprint-shotgun__/graphics/item-canister.png",
+    subgroup = "ammo-category",
+}} --[[@as data.AmmoCategory[] ]]
+
+data:extend{{
+    type = "recipe",
+    name = "blueprint-shotgun",
+    energy_required = 10,
+    results = {{type = "item", name = "blueprint-shotgun", amount = 1}},
+    ingredients = {
+        {type = "item", name = "shotgun", amount = 1},
+        {type = "item", name = "electronic-circuit", amount = 5},
+        {type = "item", name = "iron-gear-wheel", amount = 10},
+    },
+    enabled = false,
+    subgroup = "tool",
+}, {
+    type = "recipe",
+    name = "item-canister",
+    results = {{type = "item", name = "item-canister", amount = 1}},
+    ingredients = {
+        {type = "item", name = "iron-plate", amount = 1},
+        {type = "item", name = "copper-plate", amount = 2},
+        {type = "item", name = "iron-stick", amount = 3},
+    },
+    enabled = false,
+    subgroup = "tool",
+}} --[[@as data.RecipePrototype[] ]]
+
+data:extend{{
+    type = "technology",
+    name = "blueprint-shotgun",
+    icon = "__blueprint-shotgun__/graphics/blueprint-shotgun.png",
+    icon_size = 64,
+    effects = {{
+        type = "unlock-recipe",
+        recipe = "blueprint-shotgun",
+    }, {
+        type = "unlock-recipe",
+        recipe = "item-canister",
+    }, {
+        type = "unlock-recipe",
+        recipe = "iron-stick",
+    }, {
+        type = "create-ghost-on-entity-death",
+        modifier = true,
+    }},
+    unit = {
+        count = 25,
         ingredients = {
-            {type = "item", name = "shotgun", amount = 1},
-            {type = "item", name = "electronic-circuit", amount = 5},
-            {type = "item", name = "iron-gear-wheel", amount = 10},
+            {"automation-science-pack", 1},
         },
-        enabled = false,
-        subgroup = "gun",
-        -- order = "b[blueprint-shotgun]",
-    } --[[@as data.RecipePrototype]],
+        time = 15,
+    },
+    prerequisites = {"military"},
+}} --[[@as data.TechnologyPrototype[] ]]
+
+data:extend{{
+    type = "sound",
+    name = "blueprint-shotgun-shoot",
+    category = "game-effect",
+    filename = "__blueprint-shotgun__/sounds/shoot.wav",
+    min_speed = 0.95,
+    max_speed = 1.05,
+    game_controller_vibration_data =
     {
-        type = "recipe",
-        name = "item-canister",
-        results = {{type = "item", name = "item-canister", amount = 1}},
-        ingredients = {
-            {type = "item", name = "iron-plate", amount = 1},
-            {type = "item", name = "copper-plate", amount = 2},
-            {type = "item", name = "iron-stick", amount = 3},
-        },
-        enabled = false,
-        subgroup = "ammo",
-        -- order = "b[blueprint-shotgun]",
-    } --[[@as data.RecipePrototype]],
-    {
-        type = "technology",
-        name = "blueprint-shotgun",
-        icon = "__blueprint-shotgun__/graphics/blueprint-shotgun.png",
-        icon_size = 64,
-        effects = {{
-            type = "unlock-recipe",
-            recipe = "blueprint-shotgun",
-        }, {
-            type = "unlock-recipe",
-            recipe = "item-canister",
-        }},
-        unit = {
-            count = 50,
-            ingredients = {
-                {type = "item", name = "automation-science-pack", amount = 1},
-            },
-            time = 30,
-        },
-        prerequisites = {"military"},
-    } --[[@as data.TechnologyPrototype]],
-    {
-        type = "sound",
-        name = "blueprint-shotgun-shoot",
-        category = "game-effect",
-        filename = "__blueprint-shotgun__/sounds/shoot.wav",
-        min_speed = 0.95,
-        max_speed = 1.05,
-        game_controller_vibration_data =
-        {
-            high_frequency_vibration_intensity = 0.6,
-            duration = 100,
-        },
-    } --[[@as data.SoundPrototype]],
-    {
-        type = "sound",
-        name = "blueprint-shotgun-vacuum-start",
-        category = "game-effect",
-        filename = "__blueprint-shotgun__/sounds/vacuum-start.wav",
-        game_controller_vibration_data = {
-            high_frequency_vibration_intensity = 0.6,
-            duration = 100,
-        }
-    } --[[@as data.SoundPrototype]],
-    {
-        type = "sprite",
-        name = "item-shadow",
-        filename = "__blueprint-shotgun__/graphics/item-shadow.png",
-        size = 16,
-        draw_as_shadow = true,
-    } --[[@as data.SpritePrototype]],
-    {
-        type = "projectile",
-        name = "vacuum-smoke",
-        flags = {"not-on-map", "placeable-off-grid"},
-        acceleration = 0.01,
-        animation = {
-            filename = "__blueprint-shotgun__/graphics/vacuum-smoke.png",
-            -- draw_as_glow = true,
-            frame_count = 16,
-            width = 50,
-            height = 50,
-            priority = "high",
-        }
-    } --[[@as data.ProjectilePrototype]],
-    {
-        type = "custom-input",
-        name = "blueprint-shotgun-shoot",
-        key_sequence = "",
-        linked_game_control = "shoot-enemy"
-    } --[[@as data.CustomInputPrototype]],
-    {
-        type = "custom-input",
-        name = "blueprint-shotgun-mode-swap",
-        key_sequence = "CONTROL + TAB",
-    } --[[@as data.CustomInputPrototype]],
-}
+        high_frequency_vibration_intensity = 0.6,
+        duration = 100,
+    },
+}, {
+    type = "sound",
+    name = "blueprint-shotgun-vacuum-start",
+    category = "game-effect",
+    filename = "__blueprint-shotgun__/sounds/vacuum-start.wav",
+    game_controller_vibration_data = {
+        high_frequency_vibration_intensity = 0.6,
+        duration = 100,
+    }
+}} --[[@as data.SoundPrototype[] ]]
+
+data:extend{{
+    type = "sprite",
+    name = "item-shadow",
+    filename = "__blueprint-shotgun__/graphics/item-shadow.png",
+    size = 16,
+    draw_as_shadow = true,
+}} --[[@as data.SpritePrototype[] ]]
+
+data:extend{{
+    type = "projectile",
+    name = "vacuum-smoke",
+    flags = {"not-on-map", "placeable-off-grid"},
+    acceleration = 0.01,
+    animation = {
+        filename = "__blueprint-shotgun__/graphics/vacuum-smoke.png",
+        -- draw_as_glow = true,
+        frame_count = 16,
+        width = 50,
+        height = 50,
+        priority = "high",
+    },
+    hidden = true,
+}} --[[@as data.ProjectilePrototype[] ]]
+
+data:extend{{
+    type = "custom-input",
+    name = "blueprint-shotgun-shoot",
+    key_sequence = "",
+    linked_game_control = "shoot-enemy"
+}, {
+    type = "custom-input",
+    name = "blueprint-shotgun-mode-swap",
+    key_sequence = "CONTROL + TAB",
+}} --[[@as data.CustomInputPrototype[] ]]
 
 for i = 1, 2 do
-    local ingredients = {{type = "item", name = "automation-science-pack", amount = 1}}
+    local ingredients = {{"automation-science-pack", 1}}
     local prerequisites = i == 1 and {"blueprint-shotgun"} or {"blueprint-shotgun-upgrade-1", "logistic-science-pack"}
     if i == 2 then
-        ingredients[2] = {type = "item", name = "logistic-science-pack", amount = 1}
+        ingredients[2] = {"logistic-science-pack", 1}
     end
 
     data:extend{{
@@ -169,15 +177,15 @@ for i = 1, 2 do
             effect_description = {"blueprint-shotgun.vacuum-upgrade"}
         }},
         unit = {
-            count = i * 100,
+            count = i * 50,
             ingredients = ingredients,
-            time = 30,
+            time = 15,
         },
         prerequisites = prerequisites,
         upgrade = true,
-        localised_name = {"technology-name.blueprint-shotgun-upgrade", i},
+        localised_name = {"technology-name.blueprint-shotgun-upgrade", tostring(i)},
         localised_description = {"technology-description.blueprint-shotgun-upgrade"},
-    }} --[=[@as data.TechnologyPrototype[]]=]
+    }} --[[@as data.TechnologyPrototype[] ]]
 end
 
 for i = 1, 160 do
@@ -197,7 +205,6 @@ data:extend{{
     type = "character",
     name = "blueprint-shotgun-character",
     icon = "__core__/graphics/icons/entity/character.png",
-    icon_size = 64, icon_mipmaps = 4,
     flags = {"placeable-off-grid", "not-repairable", "not-on-map", "not-flammable", "not-selectable-in-game"},
     animations = {{
         idle = util.empty_sprite(),
@@ -210,6 +217,7 @@ data:extend{{
         },
         mining_with_tool = util.empty_sprite(),
     }},
+    moving_sound_animation_positions = {},
     build_distance = 0,
     damage_hit_tint = {},
     distance_per_frame = 0,
@@ -229,4 +237,16 @@ data:extend{{
     ticks_to_keep_aiming_direction = 0,
     ticks_to_keep_gun = 0,
     ticks_to_stay_in_combat = 0,
+    hidden = true,
 } --[[@as data.CharacterPrototype]]}
+
+if settings.startup["blueprint-shotgun-no-wood"].value then
+    data.raw.recipe["blueprint-shotgun"].ingredients = {
+        {type = "item", name = "iron-plate", amount = 15},
+        {type = "item", name = "copper-plate", amount = 10},
+        {type = "item", name = "electronic-circuit", amount = 5},
+        {type = "item", name = "iron-gear-wheel", amount = 15},
+    }
+end
+
+require("ultracube")

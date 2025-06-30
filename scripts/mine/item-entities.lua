@@ -2,30 +2,29 @@ local utils = require("scripts/utils") --[[@as BlueprintShotgun.utils]]
 local vec = require("scripts/vector") --[[@as BlueprintShotgun.vector]]
 local render = require("scripts/render") --[[@as BlueprintShotgun.render]]
 
----@class BlueprintShotgun.item-entities
-local lib = {}
+local ultracube_active = script.active_mods["Ultracube"]
 
 ---@param params BlueprintShotgun.HandlerParams
-function lib.process(params)
+return function(params)
     local entities = utils.find_entities_in_radius(params.surface, {
+        type = "item-entity",
         position = params.target_pos,
-        radius = 2,
-        type = "item-entity"
+        radius = params.radius,
     })
     table.sort(entities, utils.distance_sort(params.target_pos))
 
     if #entities == 0 then return end
 
-    local i = 4 + params.bonus * 2
+    local vacuum_limit = 4 + params.bonus * 2
     for _, entity in pairs(entities) do
         game.play_sound{path = "utility/picked_up_item", position = entity.position}
 
         local position = entity.position
         local stack = entity.stack
-        local id, shadow = render.draw_new_item(entity.surface, stack.name, entity.position, 0, 0)
-        rendering.move_to_back(id)
+        local sprite, shadow = render.draw_new_item(entity.surface, stack.name, entity.position, 0, 0)
+        sprite.move_to_back()
         local slot = game.create_inventory(1)
-        global.vacuum_items[id] = {
+        local vacuum_item = {
             slot = slot,
             surface = params.surface,
             character = params.character,
@@ -34,19 +33,26 @@ function lib.process(params)
             velocity = vec.random(1/60),
             height = 0,
             orientation_deviation = utils.orientation_deviaiton(),
+            sprite = sprite,
             shadow = shadow,
             deconstruct = entity.to_be_deconstructed() and params.character.force or nil,
         }
+        storage.vacuum_items[sprite.id] = vacuum_item
         slot[1].transfer_stack(stack) -- destroys the item
 
-        params.ammo_item.drain_ammo(1/8)
+        if ultracube_active then
+            local name = vacuum_item.name
+            if storage.cubes[name] then
+                vacuum_item.ultracube_token = utils.create_ultracube_token(name, slot[1].count, params.surface, position, vacuum_item.velocity, 0)
+            end
+        end
+
+        params.ammo_item.drain_ammo(0.125)
         if not params.ammo_item.valid_for_read then break end
 
-        i = i - 1
-        if i == 0 then break end
+        vacuum_limit = vacuum_limit - 1
+        if vacuum_limit == 0 then break end
     end
 
     return true
 end
-
-return lib

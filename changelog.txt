@@ -1,4 +1,117 @@
 ---------------------------------------------------------------------------------------------------
+Version: 0.2.5
+Date: 2025-06-29
+  Features:
+    - Added support for module removal
+    - Added 3-way mode swap setting
+---------------------------------------------------------------------------------------------------
+Version: 0.2.4
+Date: 2025-06-26
+  Changes:
+    - Moved gun and ammo recipe to the "repair" category
+  Optimizations:
+    - Simplified item request action logic
+  Bugfixes:
+    - Fixed crash with upgrading underground belt with ghost connection
+    - Fixed attempting to shoot modules into entity marked for upgrade with module requests
+---------------------------------------------------------------------------------------------------
+Version: 0.2.3
+Date: 2025-06-01
+  Bugfixes:
+    - Fixed building tiles consuming double items
+---------------------------------------------------------------------------------------------------
+Version: 0.2.2
+Date: 2025-05-31
+  Bugfixes:
+    - Fixed internal temporary inventories not being deleted very occasionally
+    - Fixed underground items not spilling if connection became invalid during upgrade
+    - Fixed entity search incorrectly being square instead of circular
+---------------------------------------------------------------------------------------------------
+Version: 0.2.1
+Date: 2025-05-31
+  Bugfixes:
+    - Fixed upgrade build sound playing globally
+    - Fixed quality ghosts getting built with other quality items
+    - Fixed upgrading underground belts always spilling items from the underground part
+---------------------------------------------------------------------------------------------------
+Version: 0.2.0
+Date: 2025-05-30
+  Features:
+    - Ultracube compatibility
+  Balancing:
+    - Reduced cost of initial technology to 25
+    - Reduced ammo usage of building/mining tiles
+---------------------------------------------------------------------------------------------------
+Version: 0.1.11
+Date: 2025-05-11
+  Bugfixes:
+    - Fixed incorrect bounding box for entity search function resulting in bias to the bottom right
+---------------------------------------------------------------------------------------------------
+Version: 0.1.10
+Date: 2025-05-02
+  Bugfixes:
+    - Removed debug print
+---------------------------------------------------------------------------------------------------
+Version: 0.1.9
+Date: 2025-05-02
+  Bugfixes:
+    - Fixed speed buff applying to every build action
+    - Fixed voiding tile item when replacing placeable tile with another
+---------------------------------------------------------------------------------------------------
+Version: 0.1.8
+Date: 2025-05-02
+  Changes:
+    - Improved tile placement speed by decreasing cooldown when shooting only tiles
+---------------------------------------------------------------------------------------------------
+Version: 0.1.7
+Date: 2025-04-08
+  Bugfixes:
+    - Fixed entity search only detecting the corners of bounding boxes
+    - Fixed items not coming out of the barrel of the gun in different rotations
+    - Fixed being able to place cover tiles before foundation tiles causing items to be voided
+    - Fixed cover tiles spawning foundation tile items when placed causing items to be duplicated
+---------------------------------------------------------------------------------------------------
+Version: 0.1.6
+Date: 2025-04-06
+  Bugfixes:
+    - Fixed crash with inserting fuel into trains
+---------------------------------------------------------------------------------------------------
+Version: 0.1.5
+Date: 2025-04-01
+  Changes:
+    - Entity search now uses the selection box instead of the collision box for many things, improving the feel of the gun
+    - Slight performance improvements due to the new search function
+---------------------------------------------------------------------------------------------------
+Version: 0.1.4
+Date: 2025-04-01
+  Bugfixes:
+    - Fixed audio/visual bug with attempting to mine landfil from underneath your feet
+---------------------------------------------------------------------------------------------------
+Version: 0.1.3
+Date: 2025-04-01
+  Bugfixes:
+    - Fixed crash when mining landfill from underneath your feet
+    - Fixed duplication bug with not having enough items to fulfull an item request
+---------------------------------------------------------------------------------------------------
+Version: 0.1.2
+Date: 2025-03-24
+  Changes:
+    - Added Iron sticks to the unlock technology to prevent not being able to craft ammo immediately
+  Bugfixes:
+    - Properly localized the ammo category for blueprint ammo
+    - Fixed internal character entity showing in factoriopedia
+---------------------------------------------------------------------------------------------------
+Version: 0.1.1
+Date: 2025-03-24
+  Changes:
+    - Blueprint shotgun technology now allows ghosts to be created on entity death
+---------------------------------------------------------------------------------------------------
+Version: 0.1.0
+Date: 2025-02-14
+  Features:
+    - Updated to 2.0
+    - Added setting to remove wood from the recipe
+---------------------------------------------------------------------------------------------------
 Version: 0.0.13
 Date: 2024-06-13
   Bugfixes:

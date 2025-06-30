@@ -9,47 +9,56 @@ local actions = {
     tile    = require("scripts/build/tile-ghosts").action,
 }
 
-local starting_height = 1
-
 ---@class BlueprintShotgun.flying_items
 local lib = {}
 
 ---@param event EventData.on_tick
 function lib.on_tick(event)
-    for id, item in pairs(global.flying_items) do
+    for id, item in pairs(storage.flying_items) do
         local time_remaining = item.end_tick - event.tick
 
-        if time_remaining == 0 then
+        if time_remaining <= 0 then
             actions[item.action](item)
 
-            rendering.destroy(id)
-            rendering.destroy(item.shadow)
-            global.flying_items[id] = nil
+            item.slot.destroy()
+            item.sprite.destroy()
+            item.shadow.destroy()
+            storage.flying_items[id] = nil
+            if item.ultracube_token then
+                remote.call("Ultracube", "release_ownership_token", item.ultracube_token)
+                remote.call("Ultracube", "hint_entity", item.target_entity)
+            end
+
             goto continue
         end
 
-        local duration = item.end_tick - item.start_tick
+        local duration = item.end_tick - item.start_tick -- 0 somehow
         local t = (1 - time_remaining / duration) ^ 0.9
 
-        local height = ((duration / 5) * t + starting_height) * (1 - t)
+        -- starting height                   v
+        local height = ((duration / 5) * t + 1) * (1 - t)
         local target = vec.sub(item.target_pos, item.source_pos)
         local lerp = vec.mul(target, t)
         local ground_pos = vec.add(item.source_pos, lerp)
         local air_pos = vec.add(ground_pos, {x = 0, y = -height})
         local shadow_pos = vec.add(ground_pos, {x = height, y = 0})
 
-        rendering.set_target(id, air_pos)
-        rendering.set_orientation(id, rendering.get_orientation(id) + item.orientation_deviation)
+        if item.ultracube_token then
+            remote.call("Ultracube", "update_ownership_token", item.ultracube_token, 60, {position = air_pos, velocity = vec.sub(air_pos, item.sprite.target.position)})
+        end
+
+        item.sprite.target = air_pos -- air_pos nan somehow
+        item.sprite.orientation = item.sprite.orientation + item.orientation_deviation
 
         local scale = 1 / (height / 3 + 1)
-        rendering.set_target(item.shadow, shadow_pos)
-        rendering.set_x_scale(item.shadow, scale)
-        rendering.set_y_scale(item.shadow, scale)
+        item.shadow.target = shadow_pos
+        item.shadow.x_scale = scale
+        item.shadow.y_scale = scale
 
         ::continue::
     end
 
-    for id, item in pairs(global.vacuum_items) do
+    for id, item in pairs(storage.vacuum_items) do
         item.time = item.time + 1
 
         if not (item.falling or item.character.valid) then
@@ -62,12 +71,16 @@ function lib.on_tick(event)
             item.position = vec.add(item.velocity, item.position)
 
             if item.height <= 0 then
-                utils.exact_spill(item.surface, item.position, item.slot[1], item.deconstruct)
+                local ground_items = utils.exact_spill(item.surface, item.position, item.slot[1], item.deconstruct)
                 game.play_sound{path = "utility/drop_item", position = item.position}
                 item.slot.destroy()
-                rendering.destroy(id)
-                rendering.destroy(item.shadow)
-                global.vacuum_items[id] = nil
+                item.sprite.destroy()
+                item.shadow.destroy()
+                storage.vacuum_items[id] = nil
+                if item.ultracube_token then
+                    remote.call("Ultracube", "release_ownership_token", item.ultracube_token)
+                    remote.call("Ultracube", "hint_entity", ground_items[1])
+                end
                 goto continue
             end
         else
@@ -80,15 +93,19 @@ function lib.on_tick(event)
                     item.falling = item.time
                     local player = item.character.player
                     if player then
-                        local localised_name = {"?", game.item_prototypes[stack.name].localised_name, stack.name}
+                        local localised_name = {"?", prototypes.item[stack.name].localised_name, stack.name}
                         local message = {"inventory-restriction.player-inventory-full", localised_name, {"inventory-full-message.main"}}
                         player.print(message, {skip = defines.print_skip.if_visible})
                     end
                 else
                     item.slot.destroy()
-                    rendering.destroy(id)
-                    rendering.destroy(item.shadow)
-                    global.vacuum_items[id] = nil
+                    item.sprite.destroy()
+                    item.shadow.destroy()
+                    storage.vacuum_items[id] = nil
+                    if item.ultracube_token then
+                        remote.call("Ultracube", "release_ownership_token", item.ultracube_token)
+                        remote.call("Ultracube", "hint_entity", item.character)
+                    end
                     goto continue
                 end
             end
@@ -104,16 +121,20 @@ function lib.on_tick(event)
             item.height = item.height + 1/30 * (1 - item.height)
             item.velocity = new_velocity
             item.position = vec.add(new_velocity, item.position)
+
+            if item.ultracube_token then
+                remote.call("Ultracube", "update_ownership_token", item.ultracube_token, 60, {position = item.position, velocity = new_velocity})
+            end
         end
 
-        rendering.set_target(id, vec.add(item.position, {x = 0, y = -item.height}))
-        rendering.set_target(item.shadow, vec.add(item.position, {x = item.height, y = 0}))
+        item.sprite.target = vec.add(item.position, {x = 0, y = -item.height})
+        item.shadow.target = vec.add(item.position, {x = item.height, y = 0})
 
         local scale = 1 / (item.height / 3 + 1)
-        rendering.set_x_scale(item.shadow, scale)
-        rendering.set_y_scale(item.shadow, scale)
+        item.shadow.x_scale = scale
+        item.shadow.y_scale = scale
 
-        rendering.set_orientation(id, rendering.get_orientation(id) + item.orientation_deviation * math.min(1, item.time / 30))
+        item.sprite.orientation = item.sprite.orientation + item.orientation_deviation * math.min(1, item.time / 30)
 
         ::continue::
     end
@@ -124,15 +145,17 @@ return lib
 ---@alias FlyingItem FlyingCliffExplosiveItem|FlyingBuildItem|FlyingUpgradeItem|FlyingRequestItem|FlyingTileItem
 
 ---@class FlyingItemBase
----@field name string
+---@field slot LuaInventory
 ---@field surface LuaSurface
----@field force ForceIdentification
+---@field force ForceID
 ---@field source_pos MapPosition
 ---@field target_pos MapPosition
 ---@field start_tick uint
 ---@field end_tick uint
 ---@field orientation_deviation number
----@field shadow uint
+---@field sprite LuaRenderObject
+---@field shadow LuaRenderObject
+---@field ultracube_token uint?
 
 ---@class VacuumItem
 ---@field slot LuaInventory
@@ -144,5 +167,7 @@ return lib
 ---@field velocity Vector
 ---@field height number
 ---@field orientation_deviation number
----@field shadow uint
----@field deconstruct ForceIdentification?
+---@field sprite LuaRenderObject
+---@field shadow LuaRenderObject
+---@field deconstruct ForceID?
+---@field ultracube_token uint?
