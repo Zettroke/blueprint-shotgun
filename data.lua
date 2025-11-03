@@ -171,10 +171,28 @@ for i = 1, 2 do
         icon_size = 64,
         effects = {{
             type = "nothing",
-            effect_description = {"blueprint-shotgun.capacity-upgrade"}
+            effect_description = {"blueprint-shotgun.capacity-upgrade"},
+            icons = {{
+                icon = "__blueprint-shotgun__/graphics/item-canister.png",
+            }, {
+                icon = "__core__/graphics/icons/technology/constants/constant-capacity.png",
+                icon_size = 128,
+                shift = {11, 9},
+                floating = true,
+            }},
+            use_icon_overlay_constant = false,
         }, {
             type = "nothing",
-            effect_description = {"blueprint-shotgun.vacuum-upgrade"}
+            effect_description = {"blueprint-shotgun.vacuum-upgrade"},
+            icons = {{
+                icon = "__blueprint-shotgun__/graphics/blueprint-shotgun.png"
+            }, {
+                icon = "__core__/graphics/icons/technology/constants/constant-speed.png",
+                icon_size = 128,
+                shift = {11, 9},
+                floating = true,
+            }},
+            use_icon_overlay_constant = false,
         }},
         unit = {
             count = i * 50,
@@ -200,6 +218,16 @@ for i = 1, 160 do
         }
     }}
 end
+
+data:extend{{
+    type = "armor",
+    name = "blueprint-shotgun-dummy-armor",
+    icon = "__blueprint-shotgun__/graphics/blueprint-shotgun.png",
+    infinite = true,
+    stack_size = 1,
+    hidden = true,
+    hidden_in_factoriopedia = true,
+}}
 
 data:extend{{
     type = "character",
@@ -249,4 +277,5 @@ if settings.startup["blueprint-shotgun-no-wood"].value then
     }
 end
 
-require("ultracube")
+require("compatibility/ultracube")
+require("compatibility/PlanetsLib")

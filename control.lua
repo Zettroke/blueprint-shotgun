@@ -51,10 +51,6 @@ end
 
 script.on_init(setup_globals)
 script.on_configuration_changed(function(data)
-    if data.old_version and data.old_version < "0.1.0" then
-        storage = {}
-        rendering.clear("blueprint-shotgun")
-    end
     setup_globals()
 end)
 
@@ -63,7 +59,7 @@ script.on_event("blueprint-shotgun-shoot", function(event)
     local player = game.get_player(event.player_index) --[[@as LuaPlayer]]
     if not player.character then return end
     local data = utils.get_character_data(player.character)
-    if not data.auto_swap then return end
+    if data.auto_swap == false then return end
     if event.tick - data.tick < 30 then return end
     local selected = player.selected
     if not selected then return end
@@ -82,7 +78,8 @@ script.on_event("blueprint-shotgun-mode-swap", function(event)
     if not (gun and gun.valid_for_read) then return end
     if gun.name ~= "blueprint-shotgun" then return end
     local text
-    if player.mod_settings["blueprint-shotgun-mode-swap"].value == "3-way" then
+    local setting = player.mod_settings["blueprint-shotgun-mode-swap"].value
+    if setting == "3-way" then
         if data.auto_swap then
             data.auto_swap = false
             data.mode = "build"
@@ -95,6 +92,7 @@ script.on_event("blueprint-shotgun-mode-swap", function(event)
             text = "auto"
         end
     else
+        data.auto_swap = setting == "auto"
         data.mode = data.mode == "build" and "mine" or "build"
         text = data.mode
     end
@@ -107,12 +105,13 @@ script.on_event("blueprint-shotgun-mode-swap", function(event)
     }
 end)
 
--- script.on_event(e.on_runtime_mod_setting_changed, function(event)
---     if event.setting ~= "blueprint-shotgun-mode-swap" then return end
---     local player = game.get_player(event.player_index) --[[@as LuaPlayer]]
---     if not player.character then return end
---     local data = utils.get_character_data(player.character)
--- end)
+script.on_event(e.on_runtime_mod_setting_changed, function(event)
+    if event.setting ~= "blueprint-shotgun-mode-swap" then return end
+    local player = game.get_player(event.player_index) --[[@as LuaPlayer]]
+    if not player.character then return end
+    local data = utils.get_character_data(player.character)
+    data.auto_swap = player.mod_settings[event.setting].value ~= "manual"
+end)
 
 local direction_to_angle = 1 / defines.direction.south * math.pi
 
@@ -212,7 +211,7 @@ script.on_event(e.on_script_trigger_effect, function(event)
             render.smoke(surface, target_pos, character)
             data.tick = event.tick
         else
-            if not data.auto_swap then return end
+            if data.auto_swap == false then return end
             if event.tick - data.tick < 30 then return end
             data.mode = "build"
         end

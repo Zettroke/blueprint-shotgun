@@ -78,6 +78,10 @@ function lib.action(item)
             utils.spill_item(item)
         else
             entity.health = item.slot[1].health * entity.prototype.get_max_health(entity.quality)
+
+            local stats = entity.force.get_entity_build_count_statistics(entity.surface)
+            stats.on_flow(entity, 1)
+
             script.raise_script_revive{entity = entity}
         end
     else

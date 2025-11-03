@@ -67,7 +67,7 @@ function lib.process(params)
                     positions[#positions+1] = insert_position
                     count = count - (inventory_position.count or 1)
                     if count < 0 then
-                        insert_position.count = inventory_position.count + count
+                        insert_position.count = (inventory_position.count or 1) + count
                         inventory_position.count = -count
                     else
                         plan.items.in_inventory[j] = nil

@@ -171,7 +171,7 @@ function utils.temp_character(surface, force)
         position = {x = 0, y = 0},
         force = force,
     } ---@cast character LuaEntity
-    character.insert("light-armor")
+    character.insert("blueprint-shotgun-dummy-armor")
     character.get_inventory(defines.inventory.character_guns).insert{name = "blueprint-shotgun", count = 3}
     character.get_inventory(defines.inventory.character_ammo).insert{name = "item-canister", count = 600}
     return character
