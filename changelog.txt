@@ -1,4 +1,15 @@
 ---------------------------------------------------------------------------------------------------
+Version: 0.2.15
+Date: 2025-11-15
+  Bugfixes:
+    - Fixed item requests being cleared after one item is shot
+---------------------------------------------------------------------------------------------------
+Version: 0.2.14
+Date: 2025-11-14
+  Features:
+    - Firing the gun just outside max range will snap the target position to be in range
+    - Added "Aim mode" setting for better use with controllers
+---------------------------------------------------------------------------------------------------
 Version: 0.2.13
 Date: 2025-09-23
   Compatibility:

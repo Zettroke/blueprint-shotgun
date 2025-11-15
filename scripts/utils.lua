@@ -23,8 +23,20 @@ function utils.get_character_data(character)
     if data then return data end
     ---@class BlueprintShotgun.CharacterData
     ---@field volume float
-    data = {character = character, mode = "build", auto_swap = true, tick = 0, volume = 0, cooldown = 0}
+    data = {character = character, mode = "build", auto_swap = true, aim_position = true, tick = 0, volume = 0, cooldown = 0}
     storage.characters[character.unit_number] = data
+
+    local player = character.player
+    if player then
+        data.auto_swap = player.mod_settings["blueprint-shotgun-mode-swap"].value ~= "manual"
+        local aim_mode = player.mod_settings["blueprint-shotgun-aim-mode"].value --[[@as string]]
+        if aim_mode == "auto" then
+            data.aim_position = player.input_method == defines.input_method.keyboard_and_mouse
+        else
+            data.aim_position = aim_mode == "position"
+        end
+    end
+
     script.register_on_object_destroyed(character)
     return data
 end
@@ -151,8 +163,8 @@ function utils.spill_products(surface, position, prototype, force)
     end
 end
 
----@param items ItemWithQualityCounts[]
----@return table<string, table<QualityID, ItemWithQualityCounts>>
+---@param items ItemWithQualityCounts
+---@return table<string, table<QualityID, ItemWithQualityCount>>
 function utils.map_item_count_quality(items)
     local ret = {}
     for _, item in pairs(items) do

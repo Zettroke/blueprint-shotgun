@@ -50,8 +50,17 @@ local function setup_globals()
 end
 
 script.on_init(setup_globals)
-script.on_configuration_changed(function(data)
+script.on_configuration_changed(function()
     setup_globals()
+
+    for _, data in pairs(storage.characters) do
+        if data.auto_swap == nil then
+            data.auto_swap = true
+        end
+        if data.aim_position == nil then
+            data.aim_position = true
+        end
+    end
 end)
 
 ---@param event EventData.CustomInputEvent
@@ -105,12 +114,29 @@ script.on_event("blueprint-shotgun-mode-swap", function(event)
     }
 end)
 
-script.on_event(e.on_runtime_mod_setting_changed, function(event)
-    if event.setting ~= "blueprint-shotgun-mode-swap" then return end
+script.on_event(e.on_player_input_method_changed, function(event)
     local player = game.get_player(event.player_index) --[[@as LuaPlayer]]
     if not player.character then return end
+    if player.mod_settings["blueprint-shotgun-aim-mode"].value ~= "auto" then return end
     local data = utils.get_character_data(player.character)
-    data.auto_swap = player.mod_settings[event.setting].value ~= "manual"
+    data.aim_position = player.input_method == defines.input_method.keyboard_and_mouse
+end)
+
+script.on_event(e.on_runtime_mod_setting_changed, function(event)
+    local player = game.get_player(event.player_index) --[[@as LuaPlayer]]
+    if not player.character then return end
+
+    local data = utils.get_character_data(player.character)
+    if event.setting == "blueprint-shotgun-mode-swap" then
+        data.auto_swap = player.mod_settings[event.setting].value ~= "manual"
+    elseif event.setting == "blueprint-shotgun-aim-mode" then
+        local aim_mode = player.mod_settings["blueprint-shotgun-aim-mode"].value --[[@as string]]
+        if aim_mode == "auto" then
+            data.aim_position = player.input_method == defines.input_method.keyboard_and_mouse
+        else
+            data.aim_position = aim_mode == "position"
+        end
+    end
 end)
 
 local direction_to_angle = 1 / defines.direction.south * math.pi
@@ -121,24 +147,30 @@ script.on_event(e.on_script_trigger_effect, function(event)
     local character = event.source_entity
     if not character then return end
 
-    -- if character.player then
-    --     rendering.draw_circle{
-    --         color = {r = 0.05, g = 0.1, b = 0.05, a = 0.15},
-    --         radius = 15 + character.get_radius(),
-    --         surface = character.surface,
-    --         target = character,
-    --         draw_on_ground = true,
-    --         filled = true,
-    --         players = {character.player},
-    --         time_to_live = 3,
-    --     }
-    -- end
+    local character_radius = character.get_radius()
+    local radius = 15 + character_radius
+
+--     render.debug_circle({g = 0.15, a = 0.15}, radius, surface, character)
+    -- render.debug_circle({g = 0.15, b = 0.15, a = 0.15}, radius + 3.5, surface, character)
 
     local data = utils.get_character_data(character)
     if data.mode == "build" and event.tick - data.tick < 30 then return end
 
     local source_pos = event.source_position --[[@as MapPosition]]
     local target_pos = event.target_position --[[@as MapPosition]]
+
+    local angle = math.atan2(-source_pos.x + target_pos.x, source_pos.y - target_pos.y)
+    -- render.debug_line({r = 1, g = 1}, 2, surface,
+    --     vec.add(source_pos, vec.rotate({x = 0, y = -1.125}, angle)),
+    --     vec.add(source_pos, vec.rotate({x = 0, y = -radius}, angle))
+    -- )
+
+    -- render.debug_circle({r = 1}, 1/4, surface, target_pos)
+
+    if vec.dist2(character.position, target_pos) > (15 + character.get_radius())^2 then
+        target_pos = vec.add(character.position, vec.rotate({x = 0, y = -radius}, angle))
+        -- render.debug_circle({g = 1}, 1/4, surface, target_pos)
+    end
 
     local technologies = character.force.technologies
     local bonus = settings.startup["blueprint-shotgun-cheat-bonus"].value
@@ -173,24 +205,46 @@ script.on_event(e.on_script_trigger_effect, function(event)
     if data.mode == "build" then
         if event.tick - data.tick < 30 then return end
 
-        local not_tiles = false
-        local tiles = false
-        for name, process in pairs(build) do
-            if process(params) then
-                if name == "tile_ghosts" then
-                    tiles = true
-                else
-                    not_tiles = true
-                end
-            end
-            if not params.ammo_item.valid_for_read then break end
+        local i = 1
+        local max_tries = 1
+        local offset = {x = 0, y = 0}
+
+        if not data.aim_position then
+            max_tries = 5
+            offset = vec.rotate({x = 0, y = -3.5}, angle)
+            params.target_pos = vec.add(character.position, vec.rotate({x = 0, y = -1 - character_radius}, angle))
         end
 
-        local used_item_count = ammo_limit - params.ammo_limit
-        if used_item_count > 0 then
-            game.play_sound{path = "blueprint-shotgun-shoot", position = source_pos}
-            data.tick = (tiles and not not_tiles) and event.tick - 25 or event.tick
-        end
+        local used_item_count = 0
+
+        repeat
+            local not_tiles = false
+            local tiles = false
+            for name, process in pairs(build) do
+                if process(params) then
+                    if name == "tile_ghosts" then
+                        tiles = true
+                    else
+                        not_tiles = true
+                    end
+                end
+                if not params.ammo_item.valid_for_read then break end
+            end
+
+            -- render.debug_circle({g = 0.15, a = 0.15}, params.radius, surface, params.target_pos)
+
+            used_item_count = ammo_limit - params.ammo_limit
+
+            if used_item_count > 0 then
+                game.play_sound{path = "blueprint-shotgun-shoot", position = source_pos}
+                data.tick = (tiles and not not_tiles) and event.tick - 25 or event.tick
+                break
+            else
+                params.target_pos = vec.add(params.target_pos, offset)
+            end
+
+            i = i + 1
+        until i > max_tries
 
         if used_item_count == 0 and data.auto_swap then
             data.mode = "mine"
@@ -201,16 +255,41 @@ script.on_event(e.on_script_trigger_effect, function(event)
         if event.tick - data.tick < 3 then return end
 
         params.radius = 2
-        local mined
-        for _, process in pairs(mine) do
-            mined = process(params) or mined
-            if not params.ammo_item.valid_for_read then break end
+
+        local i = 1
+        local max_tries = 1
+        local offset = {x = 0, y = 0}
+
+        if not data.aim_position then
+            max_tries = 5
+            offset = vec.rotate({x = 0, y = -3.5}, angle)
+            params.target_pos = vec.add(character.position, vec.rotate({x = 0, y = -1 - character_radius}, angle))
+        else
+            params.target_pos = target_pos
         end
 
-        if mined then
-            render.smoke(surface, target_pos, character)
-            data.tick = event.tick
-        else
+        local mined = false
+
+        repeat
+            -- render.debug_circle({r = 0.3, a = 0.3}, params.radius, surface, params.target_pos)
+
+            for _, process in pairs(mine) do
+                mined = process(params) or mined
+                if not params.ammo_item.valid_for_read then break end
+            end
+
+            if mined then
+                render.smoke(surface, params.target_pos, character)
+                data.tick = event.tick
+                break
+            else
+                params.target_pos = vec.add(params.target_pos, offset)
+            end
+
+            i = i + 1
+        until i > max_tries
+
+        if not mined then
             if data.auto_swap == false then return end
             if event.tick - data.tick < 30 then return end
             data.mode = "build"

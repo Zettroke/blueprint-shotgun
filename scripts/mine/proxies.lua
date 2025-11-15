@@ -36,7 +36,7 @@ return function(params)
                 if not params.ammo_item.valid_for_read then break end
             end
 
-            utils.condense(plan.items.in_inventory)
+            plan.items.in_inventory = utils.condense(plan.items.in_inventory)
             if #plan.items.in_inventory == 0 then
                 removal_plan[i] = nil
             end

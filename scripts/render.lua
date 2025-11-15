@@ -108,4 +108,30 @@ function render.on_tick(event)
     storage.currently_mining = {}
 end
 
+---@param color Color
+---@param radius double
+---@param surface SurfaceIdentification
+---@param target ScriptRenderTarget
+function render.debug_circle(color, radius, surface, target)
+    rendering.draw_circle{
+        color = color,
+        radius = radius,
+        surface = surface,
+        target = target,
+        filled = true,
+        time_to_live = 1,
+    }
+end
+
+function render.debug_line(color, width, surface, from, to)
+    rendering.draw_line{
+        color = {r = 1, g = 1},
+        from = from,
+        to = to,
+        surface = surface,
+        width = 2,
+        time_to_live = 1,
+    }
+end
+
 return render

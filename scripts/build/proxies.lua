@@ -27,20 +27,22 @@ function lib.process(params)
 
         if target.to_be_upgraded() then goto continue end
 
-        local to_insert = storage.to_insert[proxy.unit_number] or {} --[[@as ItemWithQualityCounts[] ]]
-        storage.to_insert = to_insert
+        local to_insert = storage.to_insert[proxy.unit_number] or {} --[[@as ItemWithQualityCounts ]]
+        storage.to_insert[proxy.unit_number] = to_insert
 
         local requests = proxy.item_requests
-        local map = utils.map_item_count_quality(requests)
-        for _, data in pairs(to_insert) do
-            local qualities = map[data.name]
-            if qualities then
-                local item_request = qualities[data.quality]
-                if item_request then
-                    item_request.count = item_request.count - data.count
-                end
-            end
-        end
+
+        --* removed since requests are subtracted from down below
+        -- local map = utils.map_item_count_quality(requests)
+        -- for _, data in pairs(to_insert) do
+        --     local qualities = map[data.name]
+        --     if qualities then
+        --         local item_request = qualities[data.quality]
+        --         if item_request then
+        --             item_request.count = item_request.count - data.count
+        --         end
+        --     end
+        -- end
 
         local inventory = params.inventory
         local item, stack, count
@@ -51,7 +53,6 @@ function lib.process(params)
                 if target.can_insert(stack) then
                     item = {name = request.name, count = min_count, quality = request.quality}
                     count = min_count
-                    item_request = request
                     break
                 end
             end
@@ -75,7 +76,7 @@ function lib.process(params)
                     if count <= 0 then break end
                 end
 
-                utils.condense(plan.items.in_inventory)
+                plan.items.in_inventory = utils.condense(plan.items.in_inventory)
                 if #plan.items.in_inventory == 0 then
                     insert_plan[i] = nil
                 end

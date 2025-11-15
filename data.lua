@@ -6,7 +6,7 @@ data:extend{{
     attack_parameters = {
         type = "projectile",
         cooldown = 1,
-        range = 15,
+        range = 15 + 3.5, -- build radius
         movement_slow_down_factor = 0,
         ammo_consumption_modifier = 0,
         ammo_categories = {"blueprint-ammo"},
