@@ -123,6 +123,7 @@ script.on_event(e.on_player_input_method_changed, function(event)
 end)
 
 script.on_event(e.on_runtime_mod_setting_changed, function(event)
+    if event.setting_type ~= "runtime-per-user" then return end
     local player = game.get_player(event.player_index) --[[@as LuaPlayer]]
     if not player.character then return end
 

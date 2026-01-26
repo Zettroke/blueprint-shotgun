@@ -26,8 +26,11 @@ return function(params)
             local slot = game.create_inventory(1)
             for j, item in pairs(plan.items.in_inventory) do
                 local inventory = target.get_inventory(item.inventory) --[[@as LuaInventory]]
-                if not slot[1].transfer_stack(inventory[item.stack + 1]) then break end
-                plan.items[j] = nil
+                if not slot[1].transfer_stack(inventory[item.stack + 1]) then
+                    slot.destroy()
+                    break
+                end
+                plan.items.in_inventory[j] = nil
 
                 vacuum_limit = vacuum_limit - 1
                 params.ammo_item.drain_ammo(0.125)
