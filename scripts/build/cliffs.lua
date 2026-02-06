@@ -2,6 +2,29 @@ local utils = require("scripts/utils") --[[@as BlueprintShotgun.utils]]
 local vec = require("scripts/vector") --[[@as BlueprintShotgun.vector]]
 local render = require("scripts/render") --[[@as BlueprintShotgun.render]]
 
+---@type table<string, LuaItemPrototype>
+local cliff_explosive_items = {}
+for _, cliff in pairs(prototypes.get_entity_filtered{{filter = "type", type = "cliff"}}) do
+    local name = cliff.cliff_explosive_prototype
+    if name then
+        cliff_explosive_items[name] = prototypes.item[name]
+    end
+end
+
+---@type table<string, string>
+local projectiles = {}
+for name, item in pairs(cliff_explosive_items) do
+    for _, action in pairs(item.capsule_action.attack_parameters.ammo_type.action) do
+        if action.action_delivery then
+            for _, delivery in pairs(action.action_delivery) do
+                if delivery.type == "projectile" then
+                    projectiles[name] = delivery.projectile -- assumes only projectile is cliff explosive
+                end
+            end
+        end
+    end
+end
+
 ---@class BlueprintShotgun.cliffs
 local lib = {}
 
@@ -90,7 +113,7 @@ end
 ---@param item FlyingCliffExplosiveItem
 function lib.action(item)
     item.surface.create_entity{
-        name = item.slot[1].name, -- assumes projectile and item share prototype name
+        name = projectiles[item.slot[1].name],
         position = item.target_pos,
         target = item.target_pos,
         speed = 1,
