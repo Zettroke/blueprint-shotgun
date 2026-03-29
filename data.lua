@@ -279,3 +279,4 @@ end
 
 require("compatibility/ultracube")
 require("compatibility/PlanetsLib")
+require("compatibility/pyanodon")
